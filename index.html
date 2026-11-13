@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -6,61 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Arena Brawl</title>
   <link rel="stylesheet" href="style.css">
-
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-    }
-  }
-  </script>
 </head>
 <body>
-  <div id="menu">
-    <h1>ARENA BRAWL</h1>
-    <h3>TOUS CONTRE TOUS</h3>
-    <p>Bienvenue dans l'arène !</p>
-    <input id="playerName" maxlength="16" value="Joueur" placeholder="Ton pseudo">
-    <button id="playButton">JOUER</button>
-    <p id="status">Prêt à combattre !</p>
-    <p class="instructions">
-      W A S D : bouger<br>
-      Souris : regarder<br>
-      Clic gauche : tirer<br>
-      Espace : super attaque
-    </p>
+  <div id="lobby" class="screen">
+    <header>
+      <h1>ARENA BRAWL</h1>
+      <div class="trophy">🏆 <span id="lobbyTrophies">0</span></div>
+    </header>
+
+    <main class="lobby-content">
+      <div class="character-preview">
+        <div class="character">🦸</div>
+        <h2 id="skinName">Combattant Classique</h2>
+      </div>
+
+      <div class="lobby-buttons">
+        <button id="playButton" class="play-button">JOUER</button>
+        <button id="skinsButton">CHOISIR UN SKIN</button>
+        <button id="trophiesButton">🏆 MES TROPHÉES</button>
+      </div>
+
+      <div id="skinsPanel" class="panel hidden">
+        <h2>Choisis ton skin</h2>
+        <div id="skinsList"></div>
+        <button id="closeSkins">FERMER</button>
+      </div>
+
+      <div id="trophiesPanel" class="panel hidden">
+        <h2>Mes trophées</h2>
+        <p>🏆 Tu as <strong id="panelTrophies">0</strong> trophées.</p>
+        <button id="closeTrophies">FERMER</button>
+      </div>
+    </main>
+    <p class="lobby-footer">Un joueur contre des robots • Mode entraînement</p>
   </div>
 
-  <div id="hud" class="hidden">
-    <div class="top">
-      <span>🏆 <b id="trophies">0</b></span>
-      <span>Éliminations : <b id="kills">0</b></span>
-      <span>Joueurs : <b id="players">1</b>/10</span>
+  <div id="gameScreen" class="hidden">
+    <div id="gameCanvas"></div>
+
+    <div id="hud">
+      <div class="hud-left">
+        <div>❤️ Vie : <span id="health">100</span></div>
+        <div>🏆 Trophées : <span id="gameTrophies">0</span></div>
+      </div>
+      <button id="pauseButton">Ⅱ PAUSE</button>
     </div>
-    <div id="crosshair">+</div>
-    <div class="bottom">
-      <span>❤️ <b id="health">100</b></span>
-      <span>Super : <b id="super">0</b>%</span>
-      <button id="pauseButton">PAUSE</button>
+
+    <div id="gameMessage">
+      Clique dans le jeu pour activer la souris.<br>
+      ZQSD ou WASD pour bouger • Clic gauche pour tirer • Échap pour libérer la souris
+    </div>
+
+    <div id="pausePanel" class="panel hidden">
+      <h2>PAUSE</h2>
+      <button id="resumeButton">REPRENDRE</button>
+      <button id="backLobbyButton">RETOURNER AU LOBBY</button>
     </div>
   </div>
 
-  <div id="pausePanel" class="panel hidden">
-    <h2>PAUSE</h2>
-    <button id="resumeButton">REPRENDRE</button>
-    <button id="menuButton">MENU</button>
-  </div>
-
-  <div id="skinPanel" class="panel hidden">
-    <h2>SKINS DÉBLOQUÉS</h2>
-    <p id="skinList"></p>
-    <button id="closeSkins">FERMER</button>
-  </div>
-
-  <div id="toast"></div>
-
-  <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="game.js"></script>
 </body>
 </html>
-
