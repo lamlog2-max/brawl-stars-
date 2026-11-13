@@ -1,15 +1,15 @@
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
-// Éléments de la page
-const lobby = document.getElementById("lobby");
-const gameScreen = document.getElementById("gameScreen");
-const canvasArea = document.getElementById("gameCanvas");
+// =====================================
+// ARENA BRAWL - SCRIPT COMPLET
+// =====================================
 
-const lobbyTrophies = document.getElementById("lobbyTrophies");
-const gameTrophies = document.getElementById("gameTrophies");
-const panelTrophies = document.getElementById("panelTrophies");
-const healthText = document.getElementById("health");
+const $ = id => document.getElementById(id);
+
+const lobby = $("lobby");
+const gameScreen = $("gameScreen");
+const canvasArea = $("gameCanvas");
 
 const skins = [
   { name: "Combattant Classique", trophies: 0, color: 0x2788ff },
@@ -30,19 +30,34 @@ const skins = [
 let trophies = Number(localStorage.getItem("arenaTrophies") || 0);
 let selectedSkin = localStorage.getItem("arenaSkin") || "Combattant Classique";
 
+let gameState = "lobby";
+let isPaused = false;
+let cameraYaw = 0;
+let health = 100;
+let lastDamageTime = 0;
+
+const keys = {};
+const bots = [];
+const bullets = [];
+const enemyBullets = [];
+
+// =====================================
+// TROPHÉES ET SKINS
+// =====================================
+
 function updateTrophies() {
-  lobbyTrophies.textContent = trophies;
-  gameTrophies.textContent = trophies;
-  panelTrophies.textContent = trophies;
+  $("lobbyTrophies").textContent = trophies;
+  $("gameTrophies").textContent = trophies;
+  $("panelTrophies").textContent = trophies;
   localStorage.setItem("arenaTrophies", trophies);
 }
 
 function updateSkinName() {
-  document.getElementById("skinName").textContent = selectedSkin;
+  $("skinName").textContent = selectedSkin;
 }
 
 function showSkins() {
-  const list = document.getElementById("skinsList");
+  const list = $("skinsList");
   list.innerHTML = "";
 
   skins.forEach(skin => {
@@ -54,41 +69,38 @@ function showSkins() {
       : "🔒 " + skin.name + " (" + skin.trophies + ")";
 
     button.disabled = !unlocked;
-    button.style.opacity = unlocked ? "1" : "0.45";
 
     button.addEventListener("click", () => {
       selectedSkin = skin.name;
       localStorage.setItem("arenaSkin", selectedSkin);
+      player.material.color.setHex(skin.color);
       updateSkinName();
-
-      if (player) {
-        player.material.color.setHex(skin.color);
-      }
-
-      document.getElementById("skinsPanel").classList.add("hidden");
+      $("skinsPanel").classList.add("hidden");
     });
 
     list.appendChild(button);
   });
 
-  document.getElementById("skinsPanel").classList.remove("hidden");
+  $("skinsPanel").classList.remove("hidden");
 }
 
-document.getElementById("skinsButton").addEventListener("click", showSkins);
-
-document.getElementById("closeSkins").addEventListener("click", () => {
-  document.getElementById("skinsPanel").classList.add("hidden");
+$("skinsButton").addEventListener("click", showSkins);
+$("closeSkins").addEventListener("click", () => {
+  $("skinsPanel").classList.add("hidden");
 });
 
-document.getElementById("trophiesButton").addEventListener("click", () => {
-  document.getElementById("trophiesPanel").classList.remove("hidden");
+$("trophiesButton").addEventListener("click", () => {
+  $("trophiesPanel").classList.remove("hidden");
 });
 
-document.getElementById("closeTrophies").addEventListener("click", () => {
-  document.getElementById("trophiesPanel").classList.add("hidden");
+$("closeTrophies").addEventListener("click", () => {
+  $("trophiesPanel").classList.add("hidden");
 });
 
-// Scène 3D
+// =====================================
+// SCÈNE 3D
+// =====================================
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8bc9ed);
 scene.fog = new THREE.Fog(0x8bc9ed, 35, 100);
@@ -104,6 +116,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.domElement.tabIndex = 0;
 canvasArea.appendChild(renderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x506040, 2));
@@ -113,7 +126,7 @@ sunlight.position.set(20, 35, 10);
 sunlight.castShadow = true;
 scene.add(sunlight);
 
-// Sol
+// SOL
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(100, 100),
   new THREE.MeshStandardMaterial({ color: 0x5b9d48 })
@@ -123,7 +136,10 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Décors
+// =====================================
+// DÉCORS
+// =====================================
+
 function makeBox(x, z, width, height, depth, color) {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(width, height, depth),
@@ -134,7 +150,6 @@ function makeBox(x, z, width, height, depth, color) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   scene.add(mesh);
-
   return mesh;
 }
 
@@ -161,19 +176,18 @@ for (let i = 0; i < 28; i++) {
 }
 
 for (let i = 0; i < 18; i++) {
-  const x = Math.random() * 65 - 32;
-  const z = Math.random() * 65 - 32;
-
   makeBox(
-    x, z,
-    2 + Math.random() * 2,
-    1.5,
-    2 + Math.random() * 2,
+    Math.random() * 65 - 32,
+    Math.random() * 65 - 32,
+    2.5, 1.5, 2.5,
     0x777777
   );
 }
 
-// Personnage joueur
+// =====================================
+// JOUEUR
+// =====================================
+
 const player = new THREE.Mesh(
   new THREE.CylinderGeometry(0.55, 0.55, 1.2, 12),
   new THREE.MeshStandardMaterial({ color: 0x2788ff })
@@ -191,8 +205,9 @@ const head = new THREE.Mesh(
 head.position.y = 1.05;
 player.add(head);
 
-// Robots ennemis
-const bots = [];
+// =====================================
+// ROBOTS
+// =====================================
 
 function createBot(x, z) {
   const bot = new THREE.Mesh(
@@ -202,25 +217,50 @@ function createBot(x, z) {
 
   bot.position.set(x, 0.9, z);
   bot.userData.health = 3;
+  bot.userData.lastShot = 0;
   bot.castShadow = true;
+
   scene.add(bot);
   bots.push(bot);
 }
 
-for (let i = 0; i < 7; i++) {
-  createBot(Math.random() * 35 - 17, Math.random() * 35 - 17);
+function createBots() {
+  for (let i = 0; i < 7; i++) {
+    createBot(
+      Math.random() * 35 - 17,
+      Math.random() * 35 - 17
+    );
+  }
 }
 
-// Variables du jeu
-const keys = {};
-const bullets = [];
+// =====================================
+// PROJECTILES
+// =====================================
 
-let gameState = "lobby";
-let cameraYaw = 0;
-let isPaused = false;
-let health = 100;
+function createProjectile(position, direction, color, speed, owner) {
+  const bullet = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 10, 10),
+    new THREE.MeshStandardMaterial({
+      color,
+      emissive: color
+    })
+  );
 
-// Tir
+  bullet.position.copy(position);
+  bullet.userData.velocity = direction.clone().normalize().multiplyScalar(speed);
+  bullet.userData.life = 100;
+  bullet.userData.owner = owner;
+
+  scene.add(bullet);
+
+  if (owner === "player") {
+    bullets.push(bullet);
+  } else {
+    enemyBullets.push(bullet);
+  }
+}
+
+// TIR DU JOUEUR
 function shoot() {
   if (gameState !== "playing" || isPaused) return;
 
@@ -230,32 +270,83 @@ function shoot() {
     -Math.cos(cameraYaw)
   );
 
-  const bullet = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 8, 8),
-    new THREE.MeshStandardMaterial({ color: 0xffee44 })
-  );
+  const position = player.position.clone();
+  position.y += 0.5;
+  position.add(direction.clone().multiplyScalar(1.2));
 
-  bullet.position.copy(player.position);
-  bullet.position.y += 0.5;
-  bullet.position.add(direction.clone().multiplyScalar(1.2));
-
-  bullet.userData.velocity = direction.multiplyScalar(0.9);
-  bullet.userData.life = 70;
-
-  scene.add(bullet);
-  bullets.push(bullet);
+  createProjectile(position, direction, 0xffee44, 0.9, "player");
 }
 
-// Clavier
+// TIR DES ROBOTS
+function botShoot(bot) {
+  const direction = new THREE.Vector3(
+    player.position.x - bot.position.x,
+    0,
+    player.position.z - bot.position.z
+  ).normalize();
+
+  const position = bot.position.clone();
+  position.y += 0.3;
+
+  createProjectile(position, direction, 0xff2222, 0.24, "bot");
+}
+
+// =====================================
+// VIE DU JOUEUR
+// =====================================
+
+function updateHealth() {
+  $("health").textContent = health;
+}
+
+function takeDamage(amount) {
+  if (gameState !== "playing" || isPaused) return;
+
+  const now = performance.now();
+
+  if (now - lastDamageTime < 350) return;
+
+  lastDamageTime = now;
+  health = Math.max(0, health - amount);
+  updateHealth();
+
+  if (health <= 0) {
+    eliminatePlayer();
+  }
+}
+
+function eliminatePlayer() {
+  gameState = "eliminated";
+
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+
+  const panel = $("pausePanel");
+
+  panel.innerHTML = `
+    <h2 style="color:#ff5555">TU AS ÉTÉ ÉLIMINÉ !</h2>
+    <p>Les robots ont gagné cette manche.</p>
+    <button id="retryButton">REJOUER</button>
+    <button id="lobbyButton">RETOURNER AU LOBBY</button>
+  `;
+
+  panel.classList.remove("hidden");
+
+  $("retryButton").addEventListener("click", startGame);
+  $("lobbyButton").addEventListener("click", backToLobby);
+}
+
+// =====================================
+// CLAVIER
+// =====================================
+
 window.addEventListener("keydown", event => {
   const key = event.key.toLowerCase();
 
   if ([
-    "w", "a", "s", "d",
-    "z", "q",
-    "arrowup", "arrowdown",
-    "arrowleft", "arrowright",
-    " "
+    "w", "a", "s", "d", "z", "q",
+    "arrowup", "arrowdown", "arrowleft", "arrowright", " "
   ].includes(key)) {
     event.preventDefault();
   }
@@ -268,12 +359,15 @@ window.addEventListener("keyup", event => {
 });
 
 window.addEventListener("blur", () => {
-  for (const key in keys) {
+  Object.keys(keys).forEach(key => {
     keys[key] = false;
-  }
+  });
 });
 
-// Souris
+// =====================================
+// SOURIS ET CAMÉRA
+// =====================================
+
 renderer.domElement.addEventListener("click", () => {
   if (gameState === "playing" && !isPaused) {
     renderer.domElement.requestPointerLock();
@@ -300,69 +394,20 @@ document.addEventListener("mousedown", event => {
   }
 });
 
-// Bouton jouer
-document.getElementById("playButton").addEventListener("click", () => {
-  lobby.classList.add("hidden");
-  gameScreen.classList.remove("hidden");
+// =====================================
+// DÉPLACEMENT
+// =====================================
 
-  gameState = "playing";
-  isPaused = false;
-  health = 100;
-
-  healthText.textContent = health;
-  player.position.set(0, 1.1, 0);
-  cameraYaw = 0;
-
-  document.getElementById("pausePanel").classList.add("hidden");
-  document.getElementById("gameMessage").classList.remove("hidden");
-
-  resizeRenderer();
-});
-
-// Pause
-function pauseGame() {
-  if (gameState !== "playing") return;
-
-  isPaused = true;
-  document.getElementById("pausePanel").classList.remove("hidden");
-
-  if (document.pointerLockElement) {
-    document.exitPointerLock();
-  }
-}
-
-document.getElementById("pauseButton").addEventListener("click", pauseGame);
-
-document.getElementById("resumeButton").addEventListener("click", () => {
-  isPaused = false;
-  document.getElementById("pausePanel").classList.add("hidden");
-});
-
-document.getElementById("backLobbyButton").addEventListener("click", () => {
-  if (document.pointerLockElement) {
-    document.exitPointerLock();
-  }
-
-  gameState = "lobby";
-  isPaused = false;
-
-  gameScreen.classList.add("hidden");
-  lobby.classList.remove("hidden");
-
-  document.getElementById("pausePanel").classList.add("hidden");
-});
-
-// Déplacement corrigé
 function movePlayer() {
   if (gameState !== "playing" || isPaused) return;
 
   let forward = 0;
   let sideways = 0;
 
-  if (keys["w"] || keys["z"] || keys["arrowup"]) forward += 1;
-  if (keys["s"] || keys["arrowdown"]) forward -= 1;
-  if (keys["d"] || keys["arrowright"]) sideways += 1;
-  if (keys["a"] || keys["q"] || keys["arrowleft"]) sideways -= 1;
+  if (keys["w"] || keys["z"] || keys["arrowup"]) forward++;
+  if (keys["s"] || keys["arrowdown"]) forward--;
+  if (keys["d"] || keys["arrowright"]) sideways++;
+  if (keys["a"] || keys["q"] || keys["arrowleft"]) sideways--;
 
   const length = Math.hypot(forward, sideways);
 
@@ -390,7 +435,10 @@ function movePlayer() {
   player.position.z = THREE.MathUtils.clamp(player.position.z, -47, 47);
 }
 
-// Caméra
+// =====================================
+// CAMÉRA
+// =====================================
+
 function updateCamera() {
   if (gameState === "lobby") {
     camera.position.set(0, 3.2, 7);
@@ -398,13 +446,10 @@ function updateCamera() {
     return;
   }
 
-  const distance = 7;
-  const height = 3.5;
-
   const target = new THREE.Vector3(
-    player.position.x + Math.sin(cameraYaw) * distance,
-    player.position.y + height,
-    player.position.z + Math.cos(cameraYaw) * distance
+    player.position.x + Math.sin(cameraYaw) * 7,
+    player.position.y + 3.5,
+    player.position.z + Math.cos(cameraYaw) * 7
   );
 
   camera.position.lerp(target, 0.15);
@@ -416,21 +461,70 @@ function updateCamera() {
   );
 }
 
-// Robots et projectiles
+// =====================================
+// INTELLIGENCE DES ROBOTS
+// =====================================
+
 function updateBots() {
   if (gameState !== "playing" || isPaused) return;
+
+  const now = performance.now();
 
   bots.forEach(bot => {
     const dx = player.position.x - bot.position.x;
     const dz = player.position.z - bot.position.z;
     const distance = Math.hypot(dx, dz);
 
-    if (distance > 2.2 && distance < 30) {
-      bot.position.x += (dx / distance) * 0.025;
-      bot.position.z += (dz / distance) * 0.025;
+    // Poursuite
+    if (distance > 2.2 && distance < 35) {
+      bot.position.x += (dx / distance) * 0.035;
+      bot.position.z += (dz / distance) * 0.035;
+    }
+
+    // Attaque à distance
+    if (
+      distance < 25 &&
+      now - bot.userData.lastShot > 1500
+    ) {
+      botShoot(bot);
+      bot.userData.lastShot = now;
+    }
+
+    // Attaque au contact
+    if (distance < 1.3) {
+      takeDamage(10);
     }
   });
 
+  updateProjectiles();
+}
+
+// =====================================
+// MISE À JOUR DES PROJECTILES
+// =====================================
+
+function updateProjectiles() {
+  // Projectiles ennemis
+  for (let i = enemyBullets.length - 1; i >= 0; i--) {
+    const bullet = enemyBullets[i];
+
+    bullet.position.add(bullet.userData.velocity);
+    bullet.userData.life--;
+
+    if (bullet.position.distanceTo(player.position) < 0.9) {
+      takeDamage(15);
+      scene.remove(bullet);
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    if (bullet.userData.life <= 0) {
+      scene.remove(bullet);
+      enemyBullets.splice(i, 1);
+    }
+  }
+
+  // Projectiles du joueur
   for (let i = bullets.length - 1; i >= 0; i--) {
     const bullet = bullets[i];
 
@@ -470,7 +564,123 @@ function updateBots() {
   }
 }
 
-// Boucle principale
+// =====================================
+// LANCER UNE PARTIE
+// =====================================
+
+function startGame() {
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+
+  bots.forEach(bot => scene.remove(bot));
+  bots.length = 0;
+
+  bullets.forEach(bullet => scene.remove(bullet));
+  bullets.length = 0;
+
+  enemyBullets.forEach(bullet => scene.remove(bullet));
+  enemyBullets.length = 0;
+
+  player.position.set(0, 1.1, 0);
+  cameraYaw = 0;
+  health = 100;
+  lastDamageTime = 0;
+
+  updateHealth();
+  createBots();
+
+  lobby.classList.add("hidden");
+  gameScreen.classList.remove("hidden");
+
+  gameState = "playing";
+  isPaused = false;
+
+  const panel = $("pausePanel");
+
+  panel.innerHTML = `
+    <h2>PAUSE</h2>
+    <button id="resumeButton">REPRENDRE</button>
+    <button id="backLobbyButton">RETOURNER AU LOBBY</button>
+  `;
+
+  panel.classList.add("hidden");
+
+  $("resumeButton").addEventListener("click", () => {
+    isPaused = false;
+    panel.classList.add("hidden");
+  });
+
+  $("backLobbyButton").addEventListener("click", backToLobby);
+
+  $("gameMessage").classList.remove("hidden");
+
+  resizeRenderer();
+}
+
+// =====================================
+// RETOUR AU LOBBY
+// =====================================
+
+function backToLobby() {
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+
+  gameState = "lobby";
+  isPaused = false;
+
+  gameScreen.classList.add("hidden");
+  lobby.classList.remove("hidden");
+
+  $("pausePanel").classList.add("hidden");
+}
+
+// =====================================
+// BOUTONS
+// =====================================
+
+$("playButton").addEventListener("click", startGame);
+
+$("pauseButton").addEventListener("click", () => {
+  if (gameState !== "playing") return;
+
+  isPaused = true;
+  $("pausePanel").classList.remove("hidden");
+
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+});
+
+// =====================================
+// REDIMENSIONNEMENT
+// =====================================
+
+function resizeRenderer() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+window.addEventListener("resize", resizeRenderer);
+
+// =====================================
+// INITIALISATION
+// =====================================
+
+const skinAtStart = skins.find(skin => skin.name === selectedSkin);
+
+if (skinAtStart && trophies >= skinAtStart.trophies) {
+  player.material.color.setHex(skinAtStart.color);
+} else {
+  selectedSkin = "Combattant Classique";
+}
+
+updateTrophies();
+updateSkinName();
+updateHealth();
+
 function animate() {
   requestAnimationFrame(animate);
 
@@ -483,24 +693,4 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-// Redimensionnement
-function resizeRenderer() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-window.addEventListener("resize", resizeRenderer);
-
-// Initialisation
-const skinAtStart = skins.find(skin => skin.name === selectedSkin);
-
-if (skinAtStart && trophies >= skinAtStart.trophies) {
-  player.material.color.setHex(skinAtStart.color);
-} else {
-  selectedSkin = "Combattant Classique";
-}
-
-updateTrophies();
-updateSkinName();
 animate();
